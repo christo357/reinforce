@@ -1,3 +1,8 @@
+"""
+    Modification 1: Added baseline for the returns. 
+    Baseline = G.mean()
+"""
+
 import random
 
 import matplotlib.pyplot as plt
@@ -28,17 +33,17 @@ print(f'Using device : {device}')
 
 ## Neural network
 class PGNet(nn.Module):
-    def __init__(self, input_size, fc, n_actions):
+    def __init__(self, input, fc1, n_actions):
         super().__init__()
-        self.input_size = input_size
-        self.fc = fc
+        self.input = input 
+        self.fc1 = fc1
         # self.fc2 = fc2
         self.n_actions = n_actions
         
         self.net = nn.Sequential(
-            nn.Linear(self.inpu_size, self.fc),
+            nn.Linear(self.input, self.fc1),
             nn.ReLU(), 
-            nn.Linear(self.fc, self.n_actions)
+            nn.Linear(self.fc1, self.n_actions)
         )
         
     def forward(self, x):
@@ -80,15 +85,16 @@ action_list = []
 
 
 total_rewards = []
-episode_idx = 0  #number of episodes = number of optimizer.step() calls
+episode_idx = 0 # number of episodes = number of optimizer.step() calls
 
 while True:
     done = False
-    
-    state, info = env.reset()
     state_list = []
-    action_list = []
     reward_list = []
+    action_list = []
+    state, _ = env.reset()
+
+        
     while not done:
         state = torch.tensor(state, dtype=torch.float32).unsqueeze(dim=0).to(device)
         logits = policy(state)
@@ -106,17 +112,16 @@ while True:
             
         state = new_state
         
-    G = calc_qvals(rewards=reward_list)
-    
+    # logging 
     episode_reward = sum(reward_list)
     total_rewards.append(episode_reward)
     mean_reward = float(np.mean(total_rewards[-100:]))
-    print(f"episode : {episode_idx} | episode reward : {episode_reward} | mean reward/100 eps : {mean_reward}")
+    print(f"episode : {episode_idx} | episode reward : {total_rewards[-1]} | mean reward/100 eps : {mean_reward}")
     wandb.log({
         "episode_reward": episode_reward, 
         "Mean reward/100 eps": mean_reward
-    }, step=episode_idx)
-    
+    }, step=episode_idx)  
+        
     # evaluation logging
     if episode_idx%100==0 and episode_idx>0:
         frames = []
@@ -141,11 +146,14 @@ while True:
             'video': wandb.Video(np.array(frames).transpose(0, 3,1,2), fps=30, format="mp4")
         }, step=episode_idx)
         
+        
+    G = calc_qvals(rewards=reward_list)
 
     # Batch all operations together
     states_batch = torch.cat(state_list, dim=0).to(device)  # Shape: (episode_length, state_dim)
     actions_batch = torch.tensor(action_list, dtype=torch.long).to(device)  # Shape: (episode_length,)
     G_tensor = torch.tensor(G, dtype=torch.float32).to(device)  # Shape: (episode_length,)
+    G_tensor = G_tensor-G_tensor.mean()
 
     # Get logits for all states at once
     logits = policy(states_batch)
@@ -154,12 +162,18 @@ while True:
 
     # Compute loss in one line
     loss = -(G_tensor * log_probs).mean()  # or .sum() depending on preference
+    
+    wandb.log({"loss": loss.item()}, step=episode_idx)
+
 
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     
-    episode_idx += 1            
+    episode_idx += 1
+    
+    
+                
     if mean_reward>450:
         break
    
