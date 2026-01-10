@@ -262,8 +262,8 @@ class VectorCollector:
                                 # print(f'idx: {idx}')
                                 # print(f"episode r: {info['episode']['r']}")
                                 episode_rewards.append(info['episode']['r'][idx])
-                else: 
-                    episode_rewards = []
+                # else: 
+                #     episode_rewards = []
                 # print(f'{episode_rewards}')
                 
                 self.state = next_state

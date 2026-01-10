@@ -30,23 +30,23 @@ import gc
 HIDDEN_LAYER = 256
 GAMMA = 0.99 # DISCOUNT FACTOR
 LAMBDA = 0.95 # FOR GAE
-ENV_ID = 'InvertedDoublePendulum-v5'
+ENV_ID = 'Reacher-v5'
 N_ENVS = 4
 T = 1024
 MINI_BATCH_SIZE = 256
 PPO_EPOCHS = 10
 CLIP_EPS = 0.2
 
-TARGET_REWARD = 9000
+TARGET_REWARD = -3.75
 
 # CRITIC_LR = 3e-4
 # POLICY_LR = 3e-4
 LR = 3e-4
-ENTROPY_BETA = 0.0
+ENTROPY_BETA = 0.0005
 ENTROPY_BETA_MIN = 1e-8
 entropy_smoothing_factor = 0.05
 total_updates = 3000000 
-target_kl = 0.015
+# target_kl = 0.015
 
 
 
@@ -509,13 +509,13 @@ def main():
     envs = gym.make_vec(ENV_ID, num_envs=N_ENVS, vectorization_mode='sync' )
     
     envs = RecordEpisodeStatistics(envs)
-    # envs = gym.wrappers.vector.NormalizeObservation(envs) 
+    envs = gym.wrappers.vector.NormalizeObservation(envs) 
     # envs = gym.wrappers.vector.NormalizeReward(envs)
     
     
     
     eval_env = gym.make(ENV_ID, render_mode='rgb_array')
-    # eval_env = gym.wrappers.NormalizeObservation(eval_env)
+    eval_env = gym.wrappers.NormalizeObservation(eval_env)
             
 
     policy = PolicyNet(
@@ -553,11 +553,11 @@ def main():
     #     patience=1000,  # If reward doesn't go up for 500 steps, lower LR
     # )
     current_beta = ENTROPY_BETA
-    # beta_scheduler = LinearBetaScheduler(
-    #     beta_start=ENTROPY_BETA, 
-    #     beta_end=ENTROPY_BETA_MIN, 
-    #     total_steps=total_updates   # Decay fully in the first 33% of training
-    # )
+    beta_scheduler = LinearBetaScheduler(
+        beta_start=ENTROPY_BETA, 
+        beta_end=ENTROPY_BETA_MIN, 
+        total_steps=total_updates   # Decay fully in the first 33% of training
+    )
     
     # beta_scheduler = BetaScheduler(
     #     target_reward=TARGET_REWARD, 
@@ -585,7 +585,7 @@ def main():
 
     print("Recording initial video (before training)...")
     print("Syncing normalization stats...")
-    # sync_envs(envs, eval_env)
+    sync_envs(envs, eval_env)
     initial_frames, initial_reward, initial_steps = record_video(eval_env, policy, device, low = action_low, high = action_high)
     wandb.log({
         "video": wandb.Video(
@@ -701,9 +701,10 @@ def main():
                 pg_loss1 = - mb_advs * ratio
                 pg_loss2 = - mb_advs * torch.clamp(ratio, 1 - CLIP_EPS, 1 + CLIP_EPS) 
                 loss_policy = torch.max(pg_loss1, pg_loss2).mean() #- (current_beta * entropy)
+                loss_total = torch.max(pg_loss1, pg_loss2).mean() - (current_beta * entropy)
                 
                 policy_optimizer.zero_grad()
-                loss_policy.backward()
+                loss_total.backward()
                 torch.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=0.5)
                 policy_optimizer.step()
                 policy_scheduler.step()
@@ -825,13 +826,13 @@ def main():
         # empty_device_cache(device)
         
         # Update trackers
-        # current_beta = beta_scheduler.update(global_step)
+        current_beta = beta_scheduler.update(global_step)
 
         
     # NEW: Record final video (after training)
     print("\nRecording final video (after training)...")
     print("Syncing normalization stats...")
-    # sync_envs(envs, eval_env)
+    sync_envs(envs, eval_env)
     final_frames, final_reward, final_steps = record_video(eval_env, policy, device, low=action_low, high =action_high)
     wandb.log({
         "video": wandb.Video(

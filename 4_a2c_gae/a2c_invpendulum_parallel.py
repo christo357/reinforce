@@ -261,8 +261,8 @@ class VectorCollector:
                                 # print(f'idx: {idx}')
                                 # print(f"episode r: {info['episode']['r']}")
                                 episode_rewards.append(info['episode']['r'][idx])
-                else: 
-                    episode_rewards = []
+                # else: 
+                #     episode_rewards = []
                 # print(f'{episode_rewards}')
                 
                 self.state = next_state
@@ -520,7 +520,7 @@ def main():
         # break
         # print(f"Episode: {episode_idx} |Steps: {step_idx} | Reward: {ep_rew} | Mean: {mean_reward:.1f}")
         wandb.log({
-                "global_step": global_step,  # <--- X-AXIS KEY
+                "global_step": global_step,  
                 
                 # --- Loss & entropy ---
                 "loss_policy": l_policy,

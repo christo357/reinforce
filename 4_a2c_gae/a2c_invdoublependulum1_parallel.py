@@ -24,7 +24,7 @@ LR = 3e-4
 # N_STEPS = 20
 ENV_ID = 'InvertedDoublePendulum-v5'
 N_ENVS = 8
-N_STEPS = 32
+N_STEPS = 128
 BATCH_SIZE = N_ENVS * N_STEPS
 
 ENTROPY_BETA = 0.0005
@@ -345,8 +345,7 @@ class VectorCollector:
                                 # print(f'idx: {idx}')
                                 # print(f"episode r: {info['episode']['r']}")
                                 episode_rewards.append(info['episode']['r'][idx])
-                else: 
-                    episode_rewards = []
+
                 # print(f'{episode_rewards}')
                 
                 self.state = next_state
